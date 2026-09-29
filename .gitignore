@@ -1,6 +1,5 @@
-@"
-.venv/
-*.zip
+
 .env
 __pycache__/
-"@ | Set-Content .gitignore
+*.pyc
+*.db

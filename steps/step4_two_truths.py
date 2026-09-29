@@ -14,19 +14,19 @@ advances the Practice flow to the next activity (Emoji Decode). It never
 triggers another Truth & Trick generation.
 
 MODEL RULE: this file never hardcodes a model name or creates its own
-Ollama client. Every generation call goes through
-generate_content(prompt) from services/ollama_service.py.
+Gemini client. Every generation call goes through
+generate_content(prompt) from services/gemini_service.py.
 
 GENERATION RULE: generate_content() is called AT MOST during the first
 render of this activity (when no question exists yet in session state),
-and up to MAX_GENERATION_ATTEMPTS times if Ollama's reply is malformed.
+and up to MAX_GENERATION_ATTEMPTS times if Gemini's reply is malformed.
 It is never called again on a plain Streamlit rerun (selecting an
 option, submitting an answer, etc.).
 
 SOURCE OF TRUTH: st.session_state["study_material"]["content"].
 No other content/source variable is introduced.
 
-ROBUSTNESS: the raw Ollama reply is cleaned (strip ```json / ``` fences,
+ROBUSTNESS: the raw Gemini reply is cleaned (strip ```json / ``` fences,
 extract the {...} block), parsed with json.loads(), then structurally
 validated (exactly 3 non-empty statements, lie in {0, 1, 2}, a non-empty
 explanation, no duplicate/near-duplicate statements within the round).
@@ -52,10 +52,10 @@ reasonably be read as true. Two things changed to fix this:
      statement isn't grounded in the study material, or if the LIE
      shares meaningful vocabulary with the study material or either TRUE
      statement - see _tokenize() below. This is a plain-Python text
-     check, not a model call, so it adds no extra Ollama requests and
+     check, not a model call, so it adds no extra Gemini requests and
      never runs on a plain rerun or answer submission.
 
-FIX (this revision): the lie index is now fully auto-detected. Ollama
+FIX (this revision): the lie index is now fully auto-detected. Gemini
 may still return a "lie" field in its JSON reply, but that value is
 never read or trusted anywhere in this file anymore - see
 _auto_classify_lie(). Instead, after the 3 statements are generated:
@@ -112,11 +112,11 @@ import re
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step13_memory import log_answer
 from steps.step19_ui import show_page_header, show_topic_bar
 
-# How many times to re-ask Ollama for the ONE Truth & Trick round when the
+# How many times to re-ask Gemini for the ONE Truth & Trick round when the
 # reply is missing, malformed, or fails validation.
 MAX_GENERATION_ATTEMPTS = 3
 
@@ -294,7 +294,7 @@ def _has_near_duplicate_statement(statements):
 # Everything below exists to enforce the "lie must be from a completely
 # different domain" requirement in plain Python, as a backstop to the
 # prompt instructions above. These are word-overlap heuristics over text
-# that's already been generated - no extra Ollama calls, and they never
+# that's already been generated - no extra Gemini calls, and they never
 # run during answer submission or a plain rerun.
 
 # Common short/filler words excluded when comparing the study material,
@@ -344,7 +344,7 @@ def _statement_grounded_in_content(statement_text, content_tokens, content):
 def _auto_classify_lie(statements, content):
     """
     Independently determine which of the 3 statements is the lie. The
-    "lie" field Ollama returned is NEVER consulted here or anywhere else
+    "lie" field Gemini returned is NEVER consulted here or anywhere else
     in this file - this function is the only source of truth for the
     lie index.
 
@@ -406,7 +406,7 @@ def _validate_and_clean(data, content):
       - the 3 statements cleanly auto-classify (see _auto_classify_lie)
         into exactly 2 study-supported TRUE statements + 1 unrelated LIE
 
-    IMPORTANT: any "lie" field in `data` (i.e. whatever Ollama returned)
+    IMPORTANT: any "lie" field in `data` (i.e. whatever Gemini returned)
     is intentionally never read here. The lie index used is always the
     one independently computed by _auto_classify_lie() from the
     statement text itself, never a value the model (or a user) supplied.
@@ -437,7 +437,7 @@ def _validate_and_clean(data, content):
     if not isinstance(explanation, str) or not explanation.strip():
         return None
 
-    # ---- Auto-detect the lie. Ollama's own "lie" field is deliberately
+    # ---- Auto-detect the lie. Gemini's own "lie" field is deliberately
     # never consulted - see _auto_classify_lie()'s docstring. ----
     lie = _auto_classify_lie(statements, content)
     if lie is None:
@@ -454,7 +454,7 @@ def _generate_truth_trick(content):
     for _attempt in range(MAX_GENERATION_ATTEMPTS):
         prompt = _build_prompt(content)
         try:
-            raw_reply = generate_content(prompt)  # existing Ollama call
+            raw_reply = generate_content(prompt)  # existing Gemini call
         except Exception:
             continue
 

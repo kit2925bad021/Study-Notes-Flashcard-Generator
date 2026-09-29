@@ -27,7 +27,7 @@ from pypdf import PdfReader
 
 # How many characters of extracted text to show in the preview,
 # so the page doesn't get huge for long documents.
-PREVIEW_CHARACTER_LIMIT = 2000
+PREVIEW_CHARACTER_LIMIT = 5000
 
 # Shown whenever a file contains no usable text.
 NO_TEXT_MESSAGE = "No readable text was found in this file."

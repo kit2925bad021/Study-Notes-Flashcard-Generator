@@ -1,7 +1,7 @@
 """
 Step 3 — Quiz Page
 ---------------------
-Generates ONE multiple-choice quiz question at a time (via Ollama) from the
+Generates ONE multiple-choice quiz question at a time (via Gemini) from the
 study material already created on the Dashboard, and lets the student
 answer it with instant feedback.
 
@@ -12,7 +12,7 @@ showed up to the student as:
 
 Two things were causing that:
   1. Option keys/shape were required to match an exact dict with exact
-     "A"/"B"/"C"/"D" keys. If Ollama sent lowercase keys ("a"/"b"/"c"/"d"),
+     "A"/"B"/"C"/"D" keys. If Gemini sent lowercase keys ("a"/"b"/"c"/"d"),
      or sent options as a plain list of 4 strings instead of a dict, the
      whole question was thrown away even though it had everything needed.
   2. A "near-duplicate option" check compared option TEXT with a fuzzy
@@ -25,7 +25,7 @@ Two things were causing that:
 Both are fixed below: option keys are matched case-insensitively and a
 plain 4-item list is also accepted, and duplicate options are now only
 rejected when they are the SAME text (ignoring case/spacing) - not merely
-"similar-sounding". Everything else (one Ollama call per question, no
+"similar-sounding". Everything else (one Gemini call per question, no
 generation on reruns, session-state driven flow) is unchanged.
 
 FIX (this revision): the Practice hub was still occasionally showing
@@ -45,8 +45,8 @@ fixes above. Two more gaps, both specific to this tiny 0.5B model:
   2. generate_content(prompt) inside _generate_one_question() was not
      wrapped in a try/except, unlike every other generator in this app
      (step5_emoji_decoder.py's _generate_emoji_challenge, for example).
-     A transient Ollama failure (a connection error, or an HTTP 500 that
-     survived ollama_service.py's own internal retries) would raise
+     A transient Gemini failure (a connection error, or an HTTP 500 that
+     survived gemini_service.py's own internal retries) would raise
      straight out of this function - and since the Practice hub's "quiz"
      branch does not wrap this call in its own try/except either, that
      would crash the whole Practice page instead of showing the normal
@@ -72,7 +72,7 @@ material. Two things changed to fix this:
      anything with the study material - see section 3 below for the new
      _tokenize()/_topic_tokens()/_option_is_topic_related() helpers and
      _correct_answer_grounded_in_content(). This is a plain-Python text
-     check, not a model call, so it adds no extra Ollama requests and
+     check, not a model call, so it adds no extra Gemini requests and
      never runs during answer submission or a normal rerun.
 
 FIX (this revision): answer-key reliability. The model could previously
@@ -82,7 +82,7 @@ student answering from an outside, correct reference (e.g. their own
 notes) could be marked wrong by a `correct_answer` that was itself wrong.
 The prompt now REQUIRES a new `evidence` field: a short VERBATIM excerpt
 copied from the study material that the correct option must be a close
-restatement of. Two new, purely deterministic (no extra Ollama calls)
+restatement of. Two new, purely deterministic (no extra Gemini calls)
 Python checks enforce this before a question is ever shown:
   - _validate_evidence_support() confirms `evidence` is non-empty and
     actually appears in the study material, after tolerant normalization
@@ -125,7 +125,7 @@ reason rather than a correctness one. Two things changed to fix this:
          to this question's specific topic (reusing the existing
          _topic_tokens() / _option_is_topic_related()) to be confirmed
          WRONG.
-     Whatever Ollama itself put in "correct_answer" is NEVER read or
+     Whatever Gemini itself put in "correct_answer" is NEVER read or
      trusted anywhere in this file any more - if it's right, wrong, or
      missing makes no difference, since validate_quiz_question()
      overwrites question["correct_answer"] with the auto-detected letter
@@ -134,7 +134,7 @@ reason rather than a correctness one. Two things changed to fix this:
      and a new one is generated instead, up to MAX_GENERATION_ATTEMPTS
      attempts total - the same "reject and retry" behavior as before,
      just driven by an independent check instead of a fragile verbatim
-     quote. This is still ONE question per Ollama call, never a batch of
+     quote. This is still ONE question per Gemini call, never a batch of
      several questions validated together.
 
 FIX (this revision): root-cause investigation + temporary debugging.
@@ -145,7 +145,7 @@ the exact _generate_one_question(...) interface step21_practice.py
 calls. Findings:
   - There is exactly ONE generation/validation path - _generate_one_question()
     - and exactly ONE question is ever requested, parsed, or validated
-    per call. Nothing in this file asks Ollama for 5 questions, expects
+    per call. Nothing in this file asks Gemini for 5 questions, expects
     a "questions" array/list of 5, or uses any "N of 5 valid questions"
     logic - quiz_questions in session state is always a single-item list
     ([question]), never a longer batch.
@@ -157,7 +157,7 @@ calls. Findings:
 Two changes address this directly:
   1. Study-source guard (Step 3): _generate_one_question() now checks
      `content` FIRST, before doing anything else. If it's missing or
-     blank, Ollama is never called at all - it returns None immediately
+     blank, Gemini is never called at all - it returns None immediately
      with the internal reason "Study material is missing." (only ever
      printed to the terminal via _print_quiz_debug(), never shown in the
      UI). This file still only ever reads the study material that its
@@ -166,14 +166,14 @@ Two changes address this directly:
      `uploaded_text` or any other source, and never a hardcoded string.
   2. Temporary internal debugging (Step 2): a new _print_quiz_debug()
      helper prints one structured "QUIZ DEBUG" block per attempt - the
-     attempt number, the first 500 characters of the raw Ollama reply,
+     attempt number, the first 500 characters of the raw Gemini reply,
      whether JSON parsing succeeded, the parsed dict (if any), whether
      validation succeeded, and the EXACT validation reason (via a new
      _validate_quiz_question_with_reason(), which validate_quiz_question()
      now wraps) - straight to the terminal running `streamlit run`, using
      plain print() so it always shows up regardless of logging
      configuration. This makes it possible to see, attempt by attempt,
-     whether a failure was (1) Ollama itself / a connection error,
+     whether a failure was (1) Gemini itself / a connection error,
      (2) invalid JSON, (3) a missing required field, (4) missing/malformed
      options, or (5) the auto-classify-correct-answer check rejecting the
      4 options. None of this is ever shown in the Streamlit UI or exposes
@@ -207,7 +207,7 @@ history yet" and never cause a failure.
 
 FIX (this revision): root cause of "options do not cleanly resolve to
 exactly one study-supported correct answer" confirmed via the QUIZ DEBUG
-terminal output - Ollama, JSON parsing, and shaping were all already
+terminal output - Gemini, JSON parsing, and shaping were all already
 succeeding on every attempt; only this one validation rule was rejecting
 otherwise-good questions. The problem was
 _auto_classify_correct_answer(): it required the three WRONG options to
@@ -226,7 +226,7 @@ rejected just because it contains a common word. Validation now:
   1. trusts the model's own declared correct_answer letter (already
      normalized to A/B/C/D by _resolve_correct_answer/_read_option_letter
      - "A", "(A)", "Answer: A", "Option A", or the option's own text
-     echoed back all resolve the same way as before; no second Ollama
+     echoed back all resolve the same way as before; no second Gemini
      call is ever made to "verify" the answer),
   2. requires that declared correct option to be reasonably supported by
      the study material - reusing the existing light-touch
@@ -240,15 +240,15 @@ rejected just because it contains a common word. Validation now:
      only catches a distractor that is basically the correct answer
      paraphrased (an "obvious answer in disguise"), never one that merely
      shares an ordinary word with the topic or the study material.
-Everything else - one Ollama call per attempt, the JSON parser, the
+Everything else - one Gemini call per attempt, the JSON parser, the
 option-shape normalization, the exact-duplicate check, MAX_GENERATION_ATTEMPTS
 = 3, one question per call, the QUIZ DEBUG terminal logging - is
 unchanged.
 
 MODEL RULE: this file never hardcodes a model name. Every generation call
-goes through generate_content(prompt) from services/ollama_service.py, and
+goes through generate_content(prompt) from services/gemini_service.py, and
 the model used is controlled ONLY by MODEL_NAME inside that file. This
-file never creates its own Ollama client.
+file never creates its own Gemini client.
 
 Embedding: pass embedded=True (used by the Practice hub,
 steps/step21_practice.py) to skip this page's own header/topic bar, since
@@ -274,7 +274,7 @@ import re
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step13_memory import log_answer, record_topic
 from steps.step18_settings import get_setting, language_instruction
 from steps.step19_ui import (
@@ -290,12 +290,12 @@ logger = logging.getLogger(__name__)
 # Stable option keys. Each key always maps to exactly one option text.
 OPTION_KEYS = ["A", "B", "C", "D"]
 
-# How many times we ask Ollama for ONE question before giving up on that
+# How many times we ask Gemini for ONE question before giving up on that
 # request (a fresh single-question request each try). Requirement: max 3.
 MAX_GENERATION_ATTEMPTS = 3
 
 # How many of the most recently asked questions (this session) are given
-# to Ollama as "please avoid repeating these" context, so back-to-back
+# to Gemini as "please avoid repeating these" context, so back-to-back
 # "New Question" clicks don't just re-serve the same fact. This is only a
 # hint inside the PROMPT - it is never used to reject a generated question,
 # so it can never be the reason generation "fails".
@@ -308,7 +308,7 @@ RECENT_QUESTIONS_TO_AVOID = 8
 
 def _build_question_prompt(subject, topic, content, language_note, avoid_questions, strict=False):
     """
-    Build the prompt sent to Ollama for exactly ONE quiz question.
+    Build the prompt sent to Gemini for exactly ONE quiz question.
 
     strict=False is used on the first attempt. strict=True is used on
     retries (attempts 2 and 3) and repeats the JSON-only rules (plus the
@@ -513,7 +513,7 @@ def _read_option_letter(value):
 
 def _normalize_options(options_raw):
     """
-    Turn whatever Ollama sent for "options" into a clean {"A": ..., "B":
+    Turn whatever Gemini sent for "options" into a clean {"A": ..., "B":
     ..., "C": ..., "D": ...} dict, or None if it can't be made sense of.
 
     Accepts two shapes, since small local models don't always follow the
@@ -525,7 +525,7 @@ def _normalize_options(options_raw):
     options = {}
 
     if isinstance(options_raw, dict):
-        # Match keys case-insensitively (Ollama sometimes replies with
+        # Match keys case-insensitively (Gemini sometimes replies with
         # lowercase "a", "b", "c", "d" instead of the requested uppercase).
         by_upper_key = {}
         for raw_key, raw_value in options_raw.items():
@@ -595,7 +595,7 @@ def _normalize_question(raw):
         "explanation": "...",
     }
 
-    NOTE: "correct_answer" here is only Ollama's own best guess, resolved
+    NOTE: "correct_answer" here is only Gemini's own best guess, resolved
     via _resolve_correct_answer() purely so the dict has a well-formed
     shape while a question is in flight. It is never trusted as the truth
     - validate_quiz_question() independently determines and overwrites it
@@ -757,10 +757,10 @@ def _validate_quiz_question_with_reason(question, content):
     itself is kept as a plain bool-returning wrapper around this for
     backward compatibility with any other caller.
 
-    Ollama's own declared "correct_answer" IS trusted here (already
+    Gemini's own declared "correct_answer" IS trusted here (already
     normalized to a plain A/B/C/D letter by _resolve_correct_answer /
     _read_option_letter inside _normalize_question) - it is checked, not
-    replaced, and no second Ollama call is ever made to re-verify it.
+    replaced, and no second Gemini call is ever made to re-verify it.
     """
     if not isinstance(question, dict):
         return False, "parsed question is not a dict"
@@ -835,10 +835,10 @@ def validate_quiz_question(question, content):
       8. the three distractors are not near-duplicate/obvious
          restatements of the correct answer.
 
-    correct_answer is Ollama's OWN declared letter (already normalized -
+    correct_answer is Gemini's OWN declared letter (already normalized -
     see _resolve_correct_answer / _read_option_letter) - it is checked
     against the rules above, never independently recomputed or
-    overwritten, and no second Ollama call is ever made to "verify" it.
+    overwritten, and no second Gemini call is ever made to "verify" it.
 
     Rules 7 and 8 are deliberately NOT a keyword/topic-overlap comparison
     against every option: that used to reject a perfectly good distractor
@@ -860,7 +860,7 @@ def validate_quiz_question(question, content):
 
 
 # --------------------------------------------------------------------------
-# 4. GENERATION + RETRY - one Ollama call per attempt, ONE question total
+# 4. GENERATION + RETRY - one Gemini call per attempt, ONE question total
 # --------------------------------------------------------------------------
 
 def _print_quiz_debug(attempt_number, raw_reply, parse_status, parsed_data, validation_status, validation_reason):
@@ -870,7 +870,7 @@ def _print_quiz_debug(attempt_number, raw_reply, parse_status, parsed_data, vali
     generation attempt straight to the terminal/server console running
     `streamlit run` - never to the Streamlit UI, and never anything the
     student sees. This is what lets a developer tell, attempt by attempt,
-    whether a failure was Ollama itself, JSON parsing, or validation -
+    whether a failure was Gemini itself, JSON parsing, or validation -
     and exactly which validation rule tripped.
 
     Uses print() (not logger.debug) on purpose: it always reaches stdout
@@ -885,7 +885,7 @@ def _print_quiz_debug(attempt_number, raw_reply, parse_status, parsed_data, vali
     print("QUIZ DEBUG")
     print("----------")
     print(f"Attempt: {attempt_number}")
-    print("Raw Ollama response:")
+    print("Raw Gemini response:")
     print(raw_reply[:500] if isinstance(raw_reply, str) else "N/A")
     print()
     print("Parsing:")
@@ -904,7 +904,7 @@ def _print_quiz_debug(attempt_number, raw_reply, parse_status, parsed_data, vali
 
 def _generate_one_question(subject, topic, content, language_note, avoid_questions):
     """
-    Ask Ollama for ONE new question, retrying up to MAX_GENERATION_ATTEMPTS
+    Ask Gemini for ONE new question, retrying up to MAX_GENERATION_ATTEMPTS
     times (a fresh call every time) if the reply can't be parsed or fails
     validation. The 2nd and 3rd attempts use a "strict" prompt with an
     extra, blunter reminder of the JSON-only and distractor-unrelatedness
@@ -922,7 +922,7 @@ def _generate_one_question(subject, topic, content, language_note, avoid_questio
     st.session_state["study_material"]["content"], passed in by the
     caller (show_quiz() / step21_practice.py) - this function never reads
     session state or any other source itself. If it's missing or blank,
-    Ollama is never called at all - this is checked first, below.
+    Gemini is never called at all - this is checked first, below.
 
     STEP 2 (debugging): every attempt - including the "no study material"
     short-circuit - prints one QUIZ DEBUG block via _print_quiz_debug()
@@ -943,7 +943,7 @@ def _generate_one_question(subject, topic, content, language_note, avoid_questio
             validation_status="FAILED",
             validation_reason="Study material is missing.",
         )
-        logger.debug("Study material is missing - Ollama was never called")
+        logger.debug("Study material is missing - Gemini was never called")
         return None
 
     # Normalize avoid_questions ONCE here (rather than relying solely on
@@ -969,10 +969,10 @@ def _generate_one_question(subject, topic, content, language_note, avoid_questio
 
         reply = None
         try:
-            reply = generate_content(prompt)  # <- the ONLY function used to call Ollama
+            reply = generate_content(prompt)  # <- the ONLY function used to call Gemini
         except Exception as error:
-            # A transient Ollama failure (e.g. a connection error, or an
-            # HTTP 500 that survived ollama_service.py's own retries)
+            # A transient Gemini failure (e.g. a connection error, or an
+            # HTTP 500 that survived gemini_service.py's own retries)
             # counts as a failed attempt here too - it is retried like any
             # other bad reply, never left to raise out of this function.
             # The Practice hub's "quiz" branch does not wrap this call in
@@ -1182,7 +1182,7 @@ def show_quiz(embedded=False):
         )
 
         # ---- Submit (only usable once per question, and only after
-        # choosing). No Ollama call happens here - this is a pure
+        # choosing). No Gemini call happens here - this is a pure
         # session-state update + a rerun to redraw the feedback below. ----
         if not already_submitted:
             if st.button("✅ Submit Answer", type="primary", disabled=selected_key is None, key="quiz_submit"):
@@ -1219,7 +1219,7 @@ def show_quiz(embedded=False):
     st.markdown("")
 
     # ---- Next-step controls (only shown after submitting; only these
-    # buttons ever trigger a new Ollama call, and only one question at a
+    # buttons ever trigger a new Gemini call, and only one question at a
     # time, exactly as before). ----
     if already_submitted:
         is_correct = st.session_state.quiz_correct.get(0, False)

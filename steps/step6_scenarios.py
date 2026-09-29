@@ -17,19 +17,19 @@ advances the Practice flow to the next activity (Dynamic Challenge). It
 never triggers another scenario generation.
 
 MODEL RULE: this file never hardcodes a model name or creates its own
-Ollama client. Every generation call goes through
-generate_content(prompt) from services/ollama_service.py.
+Gemini client. Every generation call goes through
+generate_content(prompt) from services/gemini_service.py.
 
 GENERATION RULE: generate_content() is called AT MOST during the first
 render of this activity (when no scenario exists yet in session state),
-and up to MAX_GENERATION_ATTEMPTS times if Ollama's reply is malformed.
+and up to MAX_GENERATION_ATTEMPTS times if Gemini's reply is malformed.
 It is never called again on a plain Streamlit rerun (selecting an
 option, submitting an answer, etc.).
 
 SOURCE OF TRUTH: st.session_state["study_material"]["content"].
 No other content/source variable is introduced.
 
-ROBUSTNESS: the raw Ollama reply is first coerced to a string (so a
+ROBUSTNESS: the raw Gemini reply is first coerced to a string (so a
 non-string / None reply can never raise before we even try to parse
 it), then cleaned (strip ```json / ``` fences, extract the {...}
 block), parsed with json.loads(), then structurally validated (non-empty
@@ -59,11 +59,11 @@ this:
      option shares a meaningful word with the scenario, the question, or
      the correct answer - see _tokenize() / _topic_tokens() /
      _option_is_topic_related() below. This is a plain-Python text
-     check, not a model call, so it adds no extra Ollama requests and
+     check, not a model call, so it adds no extra Gemini requests and
      never runs during answer submission or a normal rerun.
 
 FIX (this revision): the correct answer is now fully auto-detected.
-Ollama may still return a "correct_answer" field in its JSON reply, but
+Gemini may still return a "correct_answer" field in its JSON reply, but
 that value is never read or trusted anywhere in this file anymore - see
 _auto_classify_correct_answer(). Instead, after the scenario, question,
 and 3 options are generated:
@@ -121,11 +121,11 @@ import re
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step13_memory import log_answer
 from steps.step19_ui import show_page_header, show_topic_bar
 
-# How many times to re-ask Ollama for the ONE scenario round when the
+# How many times to re-ask Gemini for the ONE scenario round when the
 # reply is missing, malformed, or fails validation.
 MAX_GENERATION_ATTEMPTS = 3
 
@@ -279,7 +279,7 @@ def _parse_reply(text):
 # Everything below exists to enforce the "wrong options must be from a
 # completely different domain" requirement in plain Python, as a
 # backstop to the prompt instructions above. These are word-overlap
-# heuristics over text that's already been generated - no extra Ollama
+# heuristics over text that's already been generated - no extra Gemini
 # calls, and they never run during answer submission or a plain rerun.
 
 # Common short/filler words excluded when comparing the scenario, the
@@ -361,7 +361,7 @@ def _option_grounded_in_content(option_text, content_tokens, content):
 def _auto_classify_correct_answer(scenario, question, options, content):
     """
     Independently determine which of options A/B/C is correct. The
-    "correct_answer" field Ollama returned is NEVER consulted here or
+    "correct_answer" field Gemini returned is NEVER consulted here or
     anywhere else in this file - this function is the only source of
     truth for the correct letter.
 
@@ -431,7 +431,7 @@ def _validate_and_clean(data, content):
         CORRECT option + 2 unrelated WRONG options
 
     IMPORTANT: any "correct_answer" field in `data` (i.e. whatever
-    Ollama returned) is intentionally never read here. The correct
+    Gemini returned) is intentionally never read here. The correct
     letter used is always the one independently computed by
     _auto_classify_correct_answer() from the option text itself, never
     a value the model (or a user) supplied.
@@ -473,7 +473,7 @@ def _validate_and_clean(data, content):
     question = question.strip()
     explanation = explanation.strip()
 
-    # ---- Auto-detect the correct answer. Ollama's own "correct_answer"
+    # ---- Auto-detect the correct answer. Gemini's own "correct_answer"
     # field is deliberately never consulted - see
     # _auto_classify_correct_answer()'s docstring. ----
     correct_answer = _auto_classify_correct_answer(scenario, question, cleaned_options, content)
@@ -497,7 +497,7 @@ def _generate_scenario(content):
     for _attempt in range(MAX_GENERATION_ATTEMPTS):
         prompt = _build_prompt(content)
         try:
-            raw_reply = generate_content(prompt)  # existing Ollama call
+            raw_reply = generate_content(prompt)  # existing Gemini call
         except Exception:
             continue
 

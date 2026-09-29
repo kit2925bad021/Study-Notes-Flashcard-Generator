@@ -4,7 +4,7 @@ Step 9 — Storyboard Learning Mode
 Renders the "🎞️ Storyboard" page inside the Streamlit app.
 
 This page turns the study material already generated on the Dashboard
-into a 6-scene visual storyboard using Ollama. It is TEXT ONLY:
+into a 6-scene visual storyboard using Gemini. It is TEXT ONLY:
 no images, no videos, no image-generation API calls.
 
 Wire this up in app.py the same way Steps 1 and 2 are wired up, e.g.:
@@ -23,7 +23,7 @@ import re
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step19_ui import require_study_material, show_page_header, show_topic_bar
 
 
@@ -33,7 +33,7 @@ from steps.step19_ui import require_study_material, show_page_header, show_topic
 
 def _build_storyboard_prompt(subject, topic, content, cinematic_explanation):
     """
-    Build the prompt sent to Ollama asking for exactly 6 storyboard scenes,
+    Build the prompt sent to Gemini asking for exactly 6 storyboard scenes,
     grounded strictly in the given study material (no invented facts).
     """
 
@@ -122,7 +122,7 @@ after it:
 
 def _parse_storyboard(text):
     """
-    Parse Ollama's raw text response into a list of scene dicts:
+    Parse Gemini's raw text response into a list of scene dicts:
 
         {
             "number": int,
@@ -133,7 +133,7 @@ def _parse_storyboard(text):
         }
 
     This parser is intentionally forgiving. If it can't find clean scene
-    blocks (e.g. Ollama didn't follow the format exactly), it returns an
+    blocks (e.g. Gemini didn't follow the format exactly), it returns an
     empty list rather than raising an error — the caller is expected to
     fall back to showing the raw text in that case.
     """
@@ -199,11 +199,11 @@ def _extract_field(block, field_name):
 
 def _generate_storyboard(subject, topic, content, cinematic_explanation):
     """
-    Build the prompt, call Ollama, parse the response, and return a dict:
+    Build the prompt, call Gemini, parse the response, and return a dict:
 
         {
             "scenes": [...],       # list of parsed scene dicts (may be empty)
-            "raw_text": "...",     # the raw Ollama response, for fallback display
+            "raw_text": "...",     # the raw Gemini response, for fallback display
         }
 
     Raises whatever exception generate_content() raises — the caller
@@ -286,7 +286,7 @@ def show_storyboard():
                 st.session_state.storyboard_scene_index = 0  # always start at Scene 1
                 st.success("✅ Storyboard generated!")
             except Exception as e:
-                # Handle Ollama / API errors gracefully — don't crash the page.
+                # Handle Gemini / API errors gracefully — don't crash the page.
                 st.error(f"Sorry, we couldn't generate the storyboard: {e}")
                 return
 
@@ -305,11 +305,11 @@ def show_storyboard():
     if not scenes:
         # Safe fallback: parsing failed, so just show the raw response
         # instead of crashing or showing nothing.
+        # Never show the raw model reply to the student.
         st.warning(
-            "We generated a storyboard, but couldn't format it into scenes "
-            "automatically. Showing the raw result below:"
+            "Unable to build the storyboard scenes right now. "
+            "Please click Regenerate Storyboard to try again."
         )
-        st.markdown(raw_text if raw_text else "_No content was returned._")
         return
 
     st.markdown("---")

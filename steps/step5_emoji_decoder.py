@@ -1,7 +1,7 @@
 """
 Step 5 — Emoji Decoder
 --------------------------
-A quick learning game: Ollama turns ONE academic concept from the current
+A quick learning game: Gemini turns ONE academic concept from the current
 study material into a short, meaningful emoji clue.
 
 TWO WAYS THIS FILE IS USED
@@ -60,21 +60,21 @@ VALIDATION (a round is only accepted when ALL of these hold)
      explanation supports the answer).
   Malformed or incomplete rounds are never returned or displayed.
   NOTE: whether the emoji "really" depict the answer is judged by the
-  model that wrote the round; we do NOT spend an extra slow Ollama call to
+  model that wrote the round; we do NOT spend an extra slow Gemini call to
   double-check it. The checks above (real emoji, no answer text leaking
   into the emoji field, answer <= 3 words, explanation names the answer)
   are the cheap safety net.
 
-RETRY: max MAX_GENERATION_ATTEMPTS (3) Ollama calls per generation. On the
+RETRY: max MAX_GENERATION_ATTEMPTS (3) Gemini calls per generation. On the
 final attempt an answer that is a little too long is shortened to 3 words
 instead of being thrown away. If every attempt fails the caller receives
 None and the standalone page shows CHALLENGE_FAILURE_MESSAGE. Nothing
 raw (None, empty fields, JSON, tracebacks) is ever displayed.
 
 MODEL RULE: this file never hardcodes a model name. Every generation call
-goes through generate_content(prompt) from services/ollama_service.py, and
+goes through generate_content(prompt) from services/gemini_service.py, and
 the model used is controlled ONLY by MODEL_NAME inside that file. This
-file never creates its own Ollama client.
+file never creates its own Gemini client.
 
 SOURCE OF TRUTH: every challenge is generated only from
 st.session_state["study_material"]["content"].
@@ -92,7 +92,7 @@ import unicodedata
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step19_ui import show_page_header, show_topic_bar
 
 # The study material is trimmed so the small model gets a short, simple
@@ -132,7 +132,7 @@ _PLACEHOLDER_VALUES = {
 }
 
 # Shown by the standalone page if a round could not be generated after
-# every retry. No raw exception text or Ollama error ever reaches the page.
+# every retry. No raw exception text or Gemini error ever reaches the page.
 CHALLENGE_FAILURE_MESSAGE = "Unable to generate this round. Please try again."
 
 # The Emoji Decoder answer is a short concept/phrase, never a sentence.
@@ -336,7 +336,7 @@ def _shorten_answer(answer, concept=""):
     2. If it already fits, keep it as is.
     3. Otherwise use the concept if that is short enough.
     4. Otherwise keep the first few meaningful words of the answer.
-    No extra Ollama call is made.
+    No extra Gemini call is made.
     """
     text = _clean_answer_text(answer)
     words = text.split()
@@ -509,16 +509,16 @@ def _validate_challenge(data, allow_shorten=False):
 
 
 # ---------------------------------------------------------------------------
-# Generation — ONE Ollama call per attempt, ONE round at a time.
+# Generation — ONE Gemini call per attempt, ONE round at a time.
 # ---------------------------------------------------------------------------
 
 def _generate_emoji_challenge(content, used_concepts):
     """
     Try up to MAX_GENERATION_ATTEMPTS times to generate ONE valid round.
-    Each attempt is exactly ONE Ollama call:
+    Each attempt is exactly ONE Gemini call:
       attempt 1  -> concise prompt
       attempt 2+ -> shorter retry prompt (smaller study-material slice)
-    A failed or malformed Ollama call counts as a failed attempt and is
+    A failed or malformed Gemini call counts as a failed attempt and is
     retried - it never raises out of this function.
 
     Returns a validated round dict, or None if every attempt failed.
@@ -533,7 +533,7 @@ def _generate_emoji_challenge(content, used_concepts):
 
         prompt = _build_emoji_prompt(content, used_concepts, retry=is_retry)
         try:
-            result_text = generate_content(prompt)  # <- the ONLY function used to call Ollama
+            result_text = generate_content(prompt)  # <- the ONLY function used to call Gemini
         except Exception:
             # Timeout, connection error, etc. = failed attempt, not a crash.
             continue
@@ -589,7 +589,7 @@ def _is_correct_answer(user_text, answer):
 
 def _request_new_challenge(content):
     """
-    Fetch a brand-new round from Ollama and reset the game state.
+    Fetch a brand-new round from Gemini and reset the game state.
     Returns True on success, False on failure (so the caller only reruns
     on success and the error message stays visible).
 

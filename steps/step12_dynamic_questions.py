@@ -34,17 +34,17 @@ STABLE INTERFACE (do not change without updating step21_practice.py):
         }
 
 MODEL RULE: this file never hardcodes a model name or creates its own
-Ollama client. Every generation call goes through
-generate_content(prompt) from services/ollama_service.py.
+Gemini client. Every generation call goes through
+generate_content(prompt) from services/gemini_service.py.
 
 SOURCE OF TRUTH: st.session_state["study_material"] (subject / topic /
 content). No other content source is used.
 
-GENERATION RULE (standalone page): Ollama is only called when the page
+GENERATION RULE (standalone page): Gemini is only called when the page
 first opens with no question yet, or when the student clicks
 "Next Question" / "Try Again". Never on a plain Streamlit rerun
 (selecting an option, submitting an answer, etc.). A failed generation is
-stored, so reruns do not call Ollama again until "Try Again" is clicked.
+stored, so reruns do not call Gemini again until "Try Again" is clicked.
 
 SESSION STATE: every key this page owns starts with "dynamic_" - none of
 the Practice hub's "practice_*" keys are read or written here.
@@ -60,7 +60,7 @@ import re
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step13_memory import log_answer
 from steps.step19_ui import show_page_header, show_topic_bar
 
@@ -266,16 +266,16 @@ def _generate_dynamic_question(subject, topic, content, difficulty,
                                previous_question=None, previous_answer=None,
                                previous_result=None):
     """
-    Ask Ollama for ONE question at `difficulty`, using the previous
+    Ask Gemini for ONE question at `difficulty`, using the previous
     question / answer / result (if any) to steer variety.
     Returns the question dict described at the top of this file, or None
     if the reply could not be parsed or validated. A failure of the
-    Ollama call itself is raised to the caller (the Practice hub catches
+    Gemini call itself is raised to the caller (the Practice hub catches
     it and retries).
     """
     prompt = _build_prompt(subject, topic, content, difficulty,
                            previous_question, previous_answer, previous_result)
-    raw_reply = generate_content(prompt)  # the ONLY function used to call Ollama
+    raw_reply = generate_content(prompt)  # the ONLY function used to call Gemini
     return _validate_question(_load_json_object(raw_reply), difficulty)
 
 
@@ -293,7 +293,7 @@ def _next_difficulty(current, was_correct):
 
 _STATE_DEFAULTS = {
     "dynamic_question": None,       # the current question dict
-    "dynamic_failed": False,        # last generation failed (stored so reruns don't re-call Ollama)
+    "dynamic_failed": False,        # last generation failed (stored so reruns don't re-call Gemini)
     "dynamic_difficulty": DEFAULT_DIFFICULTY,
     "dynamic_selected": None,       # chosen option index
     "dynamic_submitted": False,
@@ -337,7 +337,7 @@ def _load_new_question(subject, topic, content, previous=None):
                 previous_question=prev_q, previous_answer=prev_a, previous_result=prev_r,
             )
         except Exception:
-            # Never show a traceback or a raw Ollama error to the student.
+            # Never show a traceback or a raw Gemini error to the student.
             question = None
 
     st.session_state.pop("dynamic_radio", None)

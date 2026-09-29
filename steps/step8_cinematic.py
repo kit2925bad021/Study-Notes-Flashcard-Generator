@@ -2,7 +2,7 @@
 Step 8 — Cinematic Explanation
 ----------------------------------
 Turns the study material already generated on the Dashboard into an
-engaging, story-style "cinematic" explanation using Ollama.
+engaging, story-style "cinematic" explanation using Gemini.
 
 Imported in app.py with:
     from steps.step8_cinematic import show_cinematic
@@ -25,8 +25,8 @@ To fix that, this version:
      upload / new generation) and clears any previous cinematic result
      so the old explanation is never shown next to new material.
 
-Ollama is still only ever called through the existing generate_content()
-from services.ollama_service, and only from inside the button handlers
+Gemini is still only ever called through the existing generate_content()
+from services.gemini_service, and only from inside the button handlers
 (never on a plain rerun).
 """
 
@@ -36,7 +36,7 @@ from collections import Counter
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step19_ui import show_page_header, show_topic_bar
 
 # ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ def _is_sufficiently_grounded(text, key_terms):
 # ---------------------------------------------------------------------------
 
 def _build_cinematic_prompt(subject, topic, content, key_terms):
-    """Build the prompt sent to Ollama, strongly grounded in the actual
+    """Build the prompt sent to Gemini, strongly grounded in the actual
     uploaded/generated study material."""
     trimmed_content = (content or "").strip()
     if len(trimmed_content) > MAX_CONTENT_CHARS:
@@ -174,7 +174,7 @@ A short, punchy wrap-up that ties the scenes back together.
 
 
 def generate_cinematic_explanation(subject, topic, content):
-    """Build the prompt, call Ollama, validate it's actually grounded in
+    """Build the prompt, call Gemini, validate it's actually grounded in
     this material, and return the raw response text."""
     key_terms = _extract_key_terms(content)
     prompt = _build_cinematic_prompt(subject, topic, content, key_terms)

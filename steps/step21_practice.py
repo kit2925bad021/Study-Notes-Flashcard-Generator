@@ -38,7 +38,7 @@ Each activity is worth exactly 1 point. Max score = 5.
 Percentage = score / 5 * 100.
 Score >= 4/5 unlocks Flashcards; below that, Flashcards stay locked.
 
-GENERATION: this file does not create its own Ollama client, hardcode a
+GENERATION: this file does not create its own Gemini client, hardcode a
 model, or duplicate any activity's JSON parsing/validation logic. It
 calls straight into each activity's own existing, already-tested "generate
 ONE item" function (each of which calls generate_content() internally,
@@ -63,13 +63,13 @@ below needs to be updated - never guess a signature.
 
 NOTE ON RETRIES: _generate_one_question, _generate_truth_trick,
 _generate_emoji_challenge, and _generate_scenario all retry internally
-(up to 3 attempts) if Ollama's reply is malformed. _generate_dynamic_question
+(up to 3 attempts) if Gemini's reply is malformed. _generate_dynamic_question
 does not - it is exactly one prompt/parse pass with no retry of its own.
 To give Dynamic Challenge the same reliability, this file retries that one
 call itself (see MAX_DYNAMIC_ATTEMPTS / the "dynamic" branch of
 _generate_for_stage), without modifying step12_dynamic_questions.py.
 
-Ollama is called ONLY when a stage starts: the very first time the
+Gemini is called ONLY when a stage starts: the very first time the
 student reaches that activity, when they click "🔁 Retry" after a failed
 generation, or when they click "🔄 Try Again" after a wrong answer (which
 generates one new item for that same activity, per the ANSWER-RESULT UI
@@ -82,7 +82,7 @@ variable is introduced.
 
 This file does not modify steps/step3_quiz.py, step4_two_truths.py,
 step5_emoji_decoder.py, step6_scenarios.py, step12_dynamic_questions.py,
-services/ollama_service.py, or app.py - their standalone pages
+services/gemini_service.py, or app.py - their standalone pages
 (embedded=False) keep working exactly as before.
 
 SESSION STATE: uses the flat practice_* keys already established for this
@@ -98,7 +98,7 @@ Flashcards" instead of "🔓 Unlock Flashcards" - unlocking already happens
 automatically the moment the score is shown (flashcards_unlocked is set
 above, before this button renders), and is now surfaced as a plain
 st.success() line instead of something the student has to click. The
-button's own behavior (navigate to "📝 Flashcards", no Ollama call) is
+button's own behavior (navigate to "📝 Flashcards", no Gemini call) is
 unchanged; step2_flashcards.py now auto-generates the deck on arrival, so
 "Open Flashcards" really does open a ready deck, not an empty page
 waiting for another click.
@@ -150,7 +150,7 @@ TOTAL_ACTIVITIES = len(STAGE_ORDER)
 PASS_SCORE = 4  # score >= 4/5 unlocks Flashcards
 
 # _generate_dynamic_question() (step12_dynamic_questions.py) makes exactly
-# ONE Ollama call and returns None on any parsing/shape failure - unlike
+# ONE Gemini call and returns None on any parsing/shape failure - unlike
 # every other stage's generator, it has no retry loop of its own. Retrying
 # it here gives Dynamic Challenge the same reliability the other four
 # stages already get internally, without touching step12_dynamic_questions.py.
@@ -657,7 +657,7 @@ def _show_final_score():
     st.markdown(f"**Percentage:** {percentage}%")
 
     # Passing the final score only marks Flashcards as eligible to unlock -
-    # it does NOT open/navigate to Flashcards and it does NOT call Ollama.
+    # it does NOT open/navigate to Flashcards and it does NOT call Gemini.
     # The existing practice_state container (if already used elsewhere to
     # gate Flashcards) is kept in sync with the top-level flag instead of
     # introducing a second, competing source of truth.
@@ -677,7 +677,7 @@ def _show_final_score():
         if st.button("🃏 Open Flashcards", type="primary", key="practice_open_flashcards"):
             # Only now - on explicit click - do we open Flashcards. This
             # reuses the app's existing page-navigation mechanism; no new
-            # navigation system and no Ollama call happen here.
+            # navigation system and no Gemini call happen here.
             st.session_state.current_page = "📝 Flashcards"
             st.rerun()
     else:
@@ -775,3 +775,4 @@ def show_practice():
             if st.button("🔄 Try Again", type="primary", key="practice_try_again_round"):
                 _start_stage(stage, subject, topic, content)
                 st.rerun()
+                

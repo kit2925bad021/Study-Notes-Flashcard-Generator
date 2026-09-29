@@ -13,7 +13,7 @@ Other steps READ the settings with the helpers below:
 
     get_setting("questions_per_quiz")   # -> 5
     language_instruction()              # -> "" for English, or a sentence
-                                        #    to add to an Ollama prompt
+                                        #    to add to an Gemini prompt
 """
 
 import streamlit as st
@@ -68,7 +68,7 @@ def get_setting(key):
 
 def language_instruction():
     """
-    A sentence to add to an Ollama prompt so the answer follows the chosen
+    A sentence to add to an Gemini prompt so the answer follows the chosen
     language. Returns "" for English.
 
     Headings and format keywords stay in English on purpose: the parsers in
@@ -132,7 +132,7 @@ def show_settings():
 
             st.caption(
                 "New study material and quizzes are written in this language. "
-                "Local models are strongest in English, so check the output."
+                "Quality can vary between languages, so check the output."
             )
 
     # ------------------------------------------------------------------

@@ -25,7 +25,7 @@ import re
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step19_ui import show_page_header, show_topic_bar
 
 
@@ -50,7 +50,7 @@ NUM_QUESTIONS = 5
 
 def _build_mode_prompt(subject, topic, content, mode):
     """
-    Build a prompt asking Ollama for exactly 5 items in the JSON shape
+    Build a prompt asking Gemini for exactly 5 items in the JSON shape
     that matches the selected mode. All content must come from the given
     study material only — no unrelated/invented facts.
     """
@@ -181,7 +181,7 @@ Respond in this exact JSON shape:
 
 def _generate_mode_content(subject, topic, content, mode):
     """
-    Build the prompt for the given mode, call Ollama, and return the raw
+    Build the prompt for the given mode, call Gemini, and return the raw
     text response. Any exception from generate_content() is left to the
     caller (show_flashcard_modes) to catch and display gracefully.
     """
@@ -196,9 +196,9 @@ def _generate_mode_content(subject, topic, content, mode):
 
 def _safe_parse_json(text):
     """
-    Try to safely parse Ollama's response as JSON.
+    Try to safely parse Gemini's response as JSON.
 
-    Handles the common case where Ollama wraps the JSON in ```json ... ```
+    Handles the common case where Gemini wraps the JSON in ```json ... ```
     code fences even when asked not to. Returns the parsed "items" list on
     success, or None if parsing fails for any reason (never raises).
     """
@@ -287,7 +287,7 @@ def show_flashcard_modes():
                         "structured questions. Showing the raw result below."
                     )
             except Exception as e:
-                # Handle Ollama / API errors gracefully — never crash the page.
+                # Handle Gemini / API errors gracefully — never crash the page.
                 st.error(f"Sorry, we couldn't generate questions: {e}")
                 return
 

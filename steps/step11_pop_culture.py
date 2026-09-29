@@ -17,7 +17,7 @@ FLOW enforced end to end (prompt -> parsing -> validation -> UI):
     quote) -> connect it back to the academic explanation -> a short
     learning takeaway.
 
-Ollama must return ONLY this JSON shape (all 8 fields required, every
+Gemini must return ONLY this JSON shape (all 8 fields required, every
 value a non-empty, non-placeholder string):
 
     {
@@ -80,9 +80,9 @@ purpose so a future change doesn't reintroduce the same two bugs):
 Both existing prompts were also tightened (same two prompts — no third
 prompt was added) to explicitly tell the model not to echo the template
 and not to use raw double quotes inside string values, since that is the
-other common source of decode failures. No new Ollama client, no direct
-`ollama` import, and no hardcoded model name were introduced — this file
-still calls only the existing services.ollama_service.generate_content().
+other common source of decode failures. No new Gemini client, no direct
+`google.genai` import, and no hardcoded model name were introduced — this file
+still calls only the existing services.gemini_service.generate_content().
 
 3. TWO MORE DECODE-FAILURE MODES were confirmed and are now tolerated in
    _decode_json_object() (same "decode_failed" stage as before — this is
@@ -110,7 +110,7 @@ This file does NOT modify st.session_state.study_material, flashcards,
 quiz data, or any other step. It only reads study_material and writes to
 its own session_state keys (all prefixed with "pop_culture").
 
-Ollama is only ever called from inside the "Explain / Regenerate" button
+Gemini is only ever called from inside the "Explain / Regenerate" button
 handler below — never during a normal Streamlit rerun.
 """
 
@@ -121,7 +121,7 @@ from html import escape
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step19_ui import require_study_material, show_page_header, show_topic_bar
 
 
@@ -129,7 +129,7 @@ from steps.step19_ui import require_study_material, show_page_header, show_topic
 # CONSTANTS
 # ----------------------------------------------------------------------
 
-# The exact 8 keys Ollama must return, in the exact shape described above.
+# The exact 8 keys Gemini must return, in the exact shape described above.
 # Every value must be a non-empty, non-placeholder string.
 REQUIRED_FIELDS = [
     "subject",
@@ -515,14 +515,14 @@ def _classify_object(data):
 
 def _parse_pop_culture_response(raw):
     """
-    Parse + structurally validate Ollama's response for the Pop Culture
+    Parse + structurally validate Gemini's response for the Pop Culture
     Lens, stage by stage, so a failure can be attributed to the EXACT
     stage that caused it instead of one generic "couldn't parse" bucket.
 
     Stages (matching the pipeline: generate_content -> raw response ->
     JSON extraction -> json.loads -> schema validation -> returned
     connection):
-      A "no_response"       — Ollama returned unusable/empty output.
+      A "no_response"       — Gemini returned unusable/empty output.
       B "extraction_failed" — no '{ ... }' object could be found at all.
       C "decode_failed"     — one or more '{ ... }'-shaped blocks were
                               found, but none of them is valid JSON.
@@ -543,7 +543,7 @@ def _parse_pop_culture_response(raw):
     Never raises.
     """
     if not isinstance(raw, str) or not raw.strip():
-        return {"stage": "no_response", "data": None, "detail": "Ollama returned an empty response."}
+        return {"stage": "no_response", "data": None, "detail": "Gemini returned an empty response."}
 
     cleaned = _CODE_FENCE_PATTERN.sub("", raw).strip()
 
@@ -632,7 +632,7 @@ def _remember_reference(reference):
 
 def _generate_pop_culture_explanation(subject, topic, content):
     """
-    Build the prompt, call Ollama, parse + structurally validate the
+    Build the prompt, call Gemini, parse + structurally validate the
     response. Retries ONCE, with a shorter/stricter prompt, but ONLY when
     the first attempt failed for a real structural reason (stages
     no_response / extraction_failed / decode_failed / missing_fields /
@@ -642,14 +642,14 @@ def _generate_pop_culture_explanation(subject, topic, content):
 
         {
             "data": {...} or None,
-            "raw_text": "...",         # last raw Ollama response, for fallback display
+            "raw_text": "...",         # last raw Gemini response, for fallback display
             "debug_stage": "...",      # exact stage the LAST attempt landed on
             "debug_detail": "...",     # human-readable reason for that stage
         }
 
     Any exception from generate_content() is left to the caller
     (show_pop_culture) to catch and display gracefully — this function
-    makes at most 2 Ollama calls, both from within a single button click.
+    makes at most 2 Gemini calls, both from within a single button click.
     """
     avoid_references = st.session_state.get("pop_culture_reference_history", [])
 
@@ -814,12 +814,11 @@ def show_pop_culture():
                     st.success("✅ Connection ready!")
                 else:
                     st.warning(
-                        "Generated content, but couldn't parse it into a "
-                        "structured connection even after retrying. Showing "
-                        "the raw result below."
+                        "Unable to create the Tamil cinema connection right "
+                        "now. Please try again."
                     )
             except Exception as e:
-                # Handle Ollama / API errors gracefully — never crash the page.
+                # Handle Gemini / API errors gracefully — never crash the page.
                 st.error(f"Sorry, we couldn't create a pop culture connection: {e}")
                 return
 
@@ -838,8 +837,10 @@ def show_pop_culture():
     # precise, stage-labelled reason instead of crashing or guessing.
     if not data:
         st.markdown("---")
+        # Never show the raw model reply to the student - just a friendly
+        # message. (The stage-labelled reason stays in the debug expander.)
         _show_debug_expander(stored.get("debug_stage"), stored.get("debug_detail"))
-        st.markdown(raw_text if raw_text else "_No content was returned._")
+        st.info("Click **🎬 Explain with Tamil Cinema** to try again.")
         return
 
     st.markdown("---")

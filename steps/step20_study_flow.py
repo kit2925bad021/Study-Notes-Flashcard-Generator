@@ -9,7 +9,7 @@ Two entry points used by app.py:
 
   show_generate_form(subject_list, go_to_page)
       The form (file, subject, topic) shown at the top of the DASHBOARD.
-      On "Generate Study Material" it makes SIX small Ollama requests (one
+      On "Generate Study Material" it makes SIX small Gemini requests (one
       per section - see "Generation" below), saves the combined result in
       st.session_state.study_material (and in SQLite when a student
       profile is saved), then sends the student to the Study Material
@@ -27,7 +27,7 @@ already uses: {"subject": ..., "topic": ..., "content": <markdown text>}.
 
 WHY SIX REQUESTS INSTEAD OF ONE
 --------------------------------
-Asking a tiny local model (qwen2.5:0.5b) to write six differently-purposed
+Asking a small language model to write six differently-purposed
 sections in a single answer reliably collapsed into six versions of the
 same paragraph - the model doesn't have the capacity to track "don't
 repeat what you already wrote three sections ago" over one long
@@ -49,8 +49,8 @@ Two extra problems were found on top of the "one job per request" split:
 
 1. Context-window overflow. By the time a later prompt (Detailed Notes,
    Examples) includes the uploaded source text AND everything written
-   so far, it can be longer than Ollama's default 2048-token context
-   window. When that happens, Ollama silently drops the oldest part of
+   so far, it can be longer than Gemini's default 2048-token context
+   window. When that happens, Gemini silently drops the oldest part of
    the prompt - often the "do not repeat this" instructions - and the
    model falls back to generic, repetitive text. Every request below
    now explicitly sets a large-enough num_ctx (see GEN_OPTIONS /
@@ -74,12 +74,12 @@ from html import escape
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step13_memory import record_topic
 from steps.step18_settings import language_instruction
 from steps.step19_ui import show_info_card
 
-# Keep prompts small: a local model reads (and answers) faster.
+# Keep prompts reasonably small: faster responses and lower API usage.
 MAX_SOURCE_CHARS = 6000
 
 # (key, label shown to the student, words that identify the heading)
@@ -368,9 +368,9 @@ def _clean_section_text(text):
 
 
 # ----------------------------------------------------------------------
-# Ollama request options for the six section calls.
+# Gemini request options for the six section calls.
 #
-# num_ctx is set explicitly (rather than left at Ollama's 2048-token
+# num_ctx is set explicitly (rather than left at Gemini's 2048-token
 # default) because a later prompt = source text + everything written so
 # far + instructions, which can otherwise overflow the default window
 # and get silently truncated - see the module docstring. Detailed Notes
@@ -412,7 +412,7 @@ def _too_similar_to_existing(new_text, existing_texts, threshold=0.75):
 
 def _run_section(prompt, existing_texts, options=None):
     """
-    Run one Ollama request for a section. If the result overlaps too
+    Run one Gemini request for a section. If the result overlaps too
     much with a section written earlier in this same generation, ask
     once more with a stronger anti-repeat instruction and use that
     instead - this is the "rewrite the shorter/later section" rule from
@@ -652,7 +652,7 @@ def _sections_look_duplicated(sections):
 
 
 def _friendly_error(error):
-    """RuntimeErrors from ollama_service are already readable; show others with their type."""
+    """RuntimeErrors from gemini_service are already readable; show others with their type."""
     if isinstance(error, RuntimeError):
         return str(error)
     return f"{type(error).__name__}: {error}"
@@ -698,12 +698,12 @@ def reset_generated_content():
 
 
 # ----------------------------------------------------------------------
-# Generation (SIX small Ollama requests, one per section - see module
+# Generation (SIX small Gemini requests, one per section - see module
 # docstring for why). Still only ever triggered by the button below, and
 # still only once per click, not on reruns.
 # ----------------------------------------------------------------------
 def _generate(subject, topic, uploaded_file, go_to_page):
-    """Run six Ollama requests (one per section), store the combined result,
+    """Run six Gemini requests (one per section), store the combined result,
     open the Study Material page."""
     source_text = ""
     if uploaded_file is not None:
@@ -722,7 +722,7 @@ def _generate(subject, topic, uploaded_file, go_to_page):
     was_truncated = len(source_text.strip()) > MAX_SOURCE_CHARS
     language_note = language_instruction()
 
-    progress = st.progress(0.0, text="Starting Ollama... (the first request can take a moment while the model loads)")
+    progress = st.progress(0.0, text="Starting... (this can take a few moments)")
     texts = {}
     try:
         progress.progress(0 / 6, text="Writing Summary... (1/6)")
@@ -797,7 +797,7 @@ def _generate(subject, topic, uploaded_file, go_to_page):
     progress.empty()
 
     if not any(texts.values()):
-        st.error("Study Material generation failed: Ollama returned an empty response.")
+        st.error("Study Material generation failed: the AI returned an empty response. Please try again.")
         return
 
     # Combine the six independently-generated pieces into the same

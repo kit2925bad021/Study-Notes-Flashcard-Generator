@@ -24,7 +24,7 @@ st.session_state.smart_revision_plan.
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 
 # Reuse the Learning Memory helpers from Step 13 instead of duplicating
 # any tracking logic here.
@@ -42,7 +42,7 @@ from steps.step19_ui import show_page_header
 
 def _build_revision_prompt(memory_summary):
     """
-    Build a prompt asking Ollama for a short, personalized revision plan
+    Build a prompt asking Gemini for a short, personalized revision plan
     based ONLY on the given memory_summary (from Step 13). No topics or
     facts outside of memory_summary should be introduced.
     """
@@ -113,7 +113,7 @@ after it:
 
 def _generate_revision_plan(memory_summary):
     """
-    Build the prompt from the memory summary, call Ollama, and return
+    Build the prompt from the memory summary, call Gemini, and return
     the raw response text. Any exception from generate_content() is
     left to the caller (show_smart_revision) to catch and display
     gracefully.
@@ -230,7 +230,7 @@ def show_smart_revision():
     st.markdown("---")
 
     # ------------------------------------------------------------
-    # No learning data yet -> don't call Ollama, just explain why.
+    # No learning data yet -> don't call Gemini, just explain why.
     # ------------------------------------------------------------
     has_learning_data = memory_summary["total_questions"] > 0
 
@@ -260,7 +260,7 @@ def show_smart_revision():
                 st.session_state.smart_revision_plan = plan
                 st.success("✅ Revision plan created!")
             except Exception as e:
-                # Handle Ollama / API errors gracefully — never crash the page.
+                # Handle Gemini / API errors gracefully — never crash the page.
                 st.error(f"Sorry, we couldn't create a revision plan: {e}")
                 return
 

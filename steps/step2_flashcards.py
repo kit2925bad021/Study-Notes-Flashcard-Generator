@@ -1,7 +1,7 @@
 """
 Step 2 — Flashcards Page
 --------------------------
-Generates flashcards (via Ollama) from the study material that was
+Generates flashcards (via Gemini) from the study material that was
 already created on the Dashboard, and lets the student review them
 one card at a time.
 
@@ -33,7 +33,7 @@ import re
 
 import streamlit as st
 
-from services.ollama_service import generate_content
+from services.gemini_service import generate_content
 from steps.step13_memory import record_topic
 from steps.step19_ui import show_topic_bar
 
@@ -44,10 +44,10 @@ from steps.step19_ui import show_topic_bar
 # the initial prompt and the "top-up" logic below always agree on the number.
 TARGET_CARD_COUNT = 10
 
-# How many times we're willing to go back to Ollama for a single click of
+# How many times we're willing to go back to Gemini for a single click of
 # Generate/Regenerate: 1 initial request + up to 2 "top-up" requests for
 # whatever is still missing after duplicates are removed. This keeps
-# requirement (12) — Ollama only runs on an explicit click, never on a
+# requirement (12) — Gemini only runs on an explicit click, never on a
 # plain Streamlit rerun — while still giving duplicates a couple of chances
 # to be replaced.
 MAX_GENERATION_ATTEMPTS = 3
@@ -156,7 +156,7 @@ def _dedupe_flashcards(flashcards):
 
 
 def _build_flashcard_prompt(subject, topic, content, count=TARGET_CARD_COUNT):
-    """Build the prompt sent to Ollama, based on the existing study material."""
+    """Build the prompt sent to Gemini, based on the existing study material."""
     numbered_format = "\n".join(f"Q{i}: <question>\nA{i}: <answer>" for i in range(1, count + 1))
     return f"""
 You are a helpful study assistant for college students.
@@ -186,7 +186,7 @@ Use this EXACT format for every flashcard (no extra text before or after):
 
 def _parse_flashcards(text):
     """
-    Turn Ollama's "Q1: ... A1: ..." style output into a list of
+    Turn Gemini's "Q1: ... A1: ..." style output into a list of
     {"question": ..., "answer": ...} dictionaries. Tolerant of extra
     spacing, bold markers, or slightly different punctuation.
     """
@@ -211,7 +211,7 @@ def _parse_flashcards(text):
 def _build_topup_prompt(subject, topic, content, existing_questions, needed_count):
     """
     Prompt used to replace duplicates that got removed. Lists the questions
-    already kept so Ollama is steered toward NEW concepts instead of
+    already kept so Gemini is steered toward NEW concepts instead of
     rewording facts that are already covered.
     """
     already_covered = "\n".join(f"- {q}" for q in existing_questions) or "(none yet)"
@@ -244,8 +244,8 @@ every flashcard (no extra text before or after):
 
 def _generate_flashcards(subject, topic, content, target_count=TARGET_CARD_COUNT):
     """
-    Call Ollama, then deduplicate (exact and reworded-duplicate questions).
-    If duplicates left us short of target_count, ask Ollama for just the
+    Call Gemini, then deduplicate (exact and reworded-duplicate questions).
+    If duplicates left us short of target_count, ask Gemini for just the
     missing cards — up to MAX_GENERATION_ATTEMPTS total requests — instead
     of regenerating the whole set. Raises on failure of the first request;
     failures on top-up requests are logged and simply leave the set a bit
@@ -667,7 +667,7 @@ def show_flashcards():
     # completed with a score of at least 4/5. This reuses the unlock flag
     # Practice itself sets (st.session_state["flashcards_unlocked"]) —
     # no second unlock mechanism is introduced here. Nothing below this
-    # is generated or displayed, and no Ollama call happens, until
+    # is generated or displayed, and no Gemini call happens, until
     # unlocked. ----
     if not st.session_state.get("flashcards_unlocked", False):
         st.markdown(
@@ -758,7 +758,7 @@ def show_flashcards():
             try:
                 new_flashcards = _generate_flashcards(subject, topic, content, target_count=TARGET_CARD_COUNT)
                 if not new_flashcards:
-                    st.error("⚠️ Ollama did not return any flashcards. Please try again.")
+                    st.error("⚠️ Gemini did not return any flashcards. Please try again.")
                 else:
                     st.session_state.flashcards = new_flashcards
                     st.session_state.flashcard_index = 0
@@ -808,7 +808,7 @@ def show_flashcards():
         # Review: leave the completion screen and go back through the SAME
         # deck from card 1. Only the temporary completion/progress UI state
         # is cleared (so marking cards can complete the deck again) - the
-        # deck itself is kept, nothing is regenerated and Ollama is not
+        # deck itself is kept, nothing is regenerated and Gemini is not
         # called.
         if st.button("Review", key="fc_review_again"):
             st.session_state.flashcard_completed = False
@@ -829,7 +829,7 @@ def show_flashcards():
             # from card 1 instead of reopening on the completion screen.
             # Nothing else is touched: st.session_state.flashcards (the
             # actual deck) and flashcard_auto_generated are left as-is, so
-            # no new deck is generated and Ollama is not called; study
+            # no new deck is generated and Gemini is not called; study
             # material, saved flashcard history in the database, and
             # authentication/session/login state are completely untouched.
             st.session_state.flashcard_completed = False

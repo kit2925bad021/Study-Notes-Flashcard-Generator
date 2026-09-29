@@ -5,7 +5,7 @@ Main Streamlit controller.
 
 This file only handles: page setup, styling, the Login / Register pages
 (accounts are stored in SQLite),
-sidebar navigation, session state, the Dashboard (including Ollama
+sidebar navigation, session state, the Dashboard (including Gemini
 generation is now on its own Study Material page), and routing to every step page. Each
 step's actual UI/logic lives in its own module under steps/ and is imported below.
 
@@ -22,11 +22,11 @@ from pathlib import Path  # only used to locate the login page's illustration
 
 import streamlit as st
 
-# Ollama integration. app.py itself makes NO Ollama calls any more:
+# Gemini integration. app.py itself makes NO Gemini calls any more:
 # Study Material is generated from the Dashboard form (steps/step20_study_flow.py,
 # one streamed request) and shown on its own page and every other step module makes its own call
 # only when the student opens that page and clicks its button.
-from services.ollama_service import generate_content  # noqa: F401 (kept for compatibility)
+from services.gemini_service import generate_content  # noqa: F401 (kept for compatibility)
 
 # ----------------------------------------------------------------------
 # SAFE STEP IMPORTS
@@ -1106,7 +1106,7 @@ subject_list = [
 if "current_page" not in st.session_state:
     st.session_state.current_page = "🏠 Dashboard"
 
-# Holds the last Ollama-generated study material:
+# Holds the last Gemini-generated study material:
 # {"subject": ..., "topic": ..., "content": ...}
 if "study_material" not in st.session_state:
     st.session_state.study_material = None
@@ -1158,7 +1158,7 @@ if "active_material_key" not in st.session_state:
 # Accounts live in the "users" table of the existing SQLite database
 # (database/study.db, see database/database.py). A password is NEVER stored:
 # only a random salt and a PBKDF2-HMAC-SHA256 hash of it are saved.
-# Nothing in this section calls Ollama, so logging in, registering and
+# Nothing in this section calls Gemini, so logging in, registering and
 # logging out never generate anything.
 # ----------------------------------------------------------------------
 
@@ -1383,7 +1383,7 @@ LOGIN_IMAGE_PATH = Path(__file__).resolve().parent / "assets" / "login_illustrat
 # NOTE: this function only changes visual presentation. Every authentication
 # call below (register_user / authenticate / start_session / set_auth_view)
 # is the exact same function used before this redesign — nothing about
-# validation, hashing, SQLite, session_state or Ollama was touched.
+# validation, hashing, SQLite, session_state or Gemini was touched.
 def show_forgot_notice():
     """Button callback for the "Forgot Password?" link (display-only message)."""
     st.session_state.auth_info = (
@@ -1974,7 +1974,7 @@ if st.session_state.current_page in PAGES_NEEDING_MATERIAL and not (
 # ----------------------------------------------------------------------
 # PAGE: DASHBOARD
 # Visual redesign only — same session-state values, same callbacks, same
-# target pages as before. Nothing on this page calls Ollama; the one
+# target pages as before. Nothing on this page calls Gemini; the one
 # existing exception (the "Create Study Material" form below) already
 # only calls it when the student explicitly submits that form, exactly
 # as it did before this redesign.
@@ -2103,7 +2103,7 @@ if st.session_state.current_page == "🏠 Dashboard":
     # ---- STEP 1 of the flow: generate study material ----
     # Same existing form (file, subject, topic) as before. On success the
     # student is taken to the Study Material page. Nothing generated is
-    # displayed here, and Ollama is only called if the student submits it.
+    # displayed here, and Gemini is only called if the student submits it.
     with st.expander("➕ Create New Study Material", expanded=st.session_state.get("show_create_form", False)):
         if STEP20_AVAILABLE:
             show_generate_form(subject_list, go_to_page)
@@ -2186,7 +2186,7 @@ if st.session_state.current_page == "🏠 Dashboard":
 # PAGE: STUDY MATERIAL
 # Implemented in steps/step20_study_flow.py: the complete sectioned display
 # of the generated material and the "What would you like to do next?"
-# buttons. (The generate form and the ONE Ollama request live on the
+# buttons. (The generate form and the ONE Gemini request live on the
 # Dashboard, via show_generate_form().) (steps/step1_study_material.py is kept and still imported, but
 # it only understands the old flashcards+quiz-in-one-answer format, so it
 # is no longer routed to.)
